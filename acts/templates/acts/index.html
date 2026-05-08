@@ -1,0 +1,182 @@
+{% extends 'base.html' %}
+
+{% block title %}📋 Список актов — Мостоотряд-69{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-12">
+        <h2 class="fw-bold">
+            <i class="bi bi-journal-bookmark"></i> Акты КС-2 и КС-3
+        </h2>
+        <p class="text-muted">Система сдачи-приёмки выполненных работ</p>
+    </div>
+</div>
+
+<!-- Кнопки создания -->
+<div class="row g-3 mb-4">
+    <div class="col-md-6">
+        <a href="{% url 'acts:ks2_create' %}" class="btn btn-primary w-100 py-3">
+            <i class="bi bi-file-earmark-bar-graph fs-4 d-block mb-2"></i>
+            <strong>Создать Акт КС-2</strong><br>
+            <small>Приёмка выполненных работ</small>
+        </a>
+    </div>
+    <div class="col-md-6">
+        <a href="{% url 'acts:ks3_create' %}" class="btn btn-success w-100 py-3">
+            <i class="bi bi-file-earmark-bar-graph fs-4 d-block mb-2"></i>
+            <strong>Создать Справку КС-3</strong><br>
+            <small>Стоимость выполненных работ</small>
+        </a>
+    </div>
+</div>
+
+<!-- Таблица КС-2 -->
+<div class="card mb-4">
+    <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+        <h5 class="mb-0"><i class="bi bi-file-earmark-bar-graph"></i> Акты КС-2</h5>
+        <span class="badge bg-light text-primary">{{ ks2_acts|length }}</span>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>№ документа</th>
+                        <th>Договор</th>
+                        <th>Период</th>
+                        <th>Стройка</th>
+                        <th>Статус</th>
+                        <th>Дата</th>
+                        <th>Действия</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for act in ks2_acts %}
+                    <tr>
+                        <td><strong>{{ act.document_number }}</strong></td>
+                        <td>{{ act.contract_number }} от {{ act.contract_date|date:"d.m.Y" }}</td>
+                        <td>{{ act.report_from|date:"d.m.Y" }} — {{ act.report_to|date:"d.m.Y" }}</td>
+                        <td>{{ act.construction|truncatechars:30 }}</td>
+                        <td>
+                            {% if act.status == 'draft' %}
+                                <span class="badge bg-secondary">Черновик</span>
+                            {% elif act.status == 'sent' %}
+                                <span class="badge bg-info">Отправлен</span>
+                            {% elif act.status == 'approved' %}
+                                <span class="badge bg-success">Согласован</span>
+                            {% else %}
+                                <span class="badge bg-danger">Отклонён</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ act.created_at|date:"d.m.Y H:i" }}</td>
+                        <td>
+                            <div class="btn-group btn-group-sm">
+                                <a href="{% url 'acts:detail' act.pk %}" class="btn btn-outline-primary" title="Просмотр">
+                                    <i class="bi bi-eye"></i>
+                                </a>
+                                <a href="{% url 'acts:download' act.pk 'pdf' %}" class="btn btn-outline-danger" title="Скачать PDF">
+                                    <i class="bi bi-file-pdf"></i>
+                                </a>
+                                <a href="{% url 'acts:download' act.pk 'xlsx' %}" class="btn btn-outline-success" title="Скачать XLSX">
+                                    <i class="bi bi-file-excel"></i>
+                                </a>
+                                {% if act.status == 'draft' %}
+                                <a href="{% url 'acts:edit' act.pk %}" class="btn btn-outline-warning" title="Редактировать">
+                                    <i class="bi bi-pencil"></i>
+                                </a>
+                                <a href="{% url 'acts:delete' act.pk %}" class="btn btn-outline-danger" title="Удалить">
+                                    <i class="bi bi-trash"></i>
+                                </a>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="7" class="text-center py-4 text-muted">
+                            <i class="bi bi-inbox fs-1 d-block mb-2"></i>
+                            Нет созданных актов КС-2
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Таблица КС-3 -->
+<div class="card">
+    <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
+        <h5 class="mb-0"><i class="bi bi-file-earmark-bar-graph"></i> Справки КС-3</h5>
+        <span class="badge bg-light text-success">{{ ks3_acts|length }}</span>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>№ документа</th>
+                        <th>Договор</th>
+                        <th>Период</th>
+                        <th>Стройка</th>
+                        <th>Статус</th>
+                        <th>Дата</th>
+                        <th>Действия</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for act in ks3_acts %}
+                    <tr>
+                        <td><strong>{{ act.document_number }}</strong></td>
+                        <td>{{ act.contract_number }} от {{ act.contract_date|date:"d.m.Y" }}</td>
+                        <td>{{ act.report_from|date:"d.m.Y" }} — {{ act.report_to|date:"d.m.Y" }}</td>
+                        <td>{{ act.construction|truncatechars:30 }}</td>
+                        <td>
+                            {% if act.status == 'draft' %}
+                                <span class="badge bg-secondary">Черновик</span>
+                            {% elif act.status == 'sent' %}
+                                <span class="badge bg-info">Отправлен</span>
+                            {% elif act.status == 'approved' %}
+                                <span class="badge bg-success">Согласован</span>
+                            {% else %}
+                                <span class="badge bg-danger">Отклонён</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ act.created_at|date:"d.m.Y H:i" }}</td>
+                        <td>
+                            <div class="btn-group btn-group-sm">
+                                <a href="{% url 'acts:detail' act.pk %}" class="btn btn-outline-primary" title="Просмотр">
+                                    <i class="bi bi-eye"></i>
+                                </a>
+                                <a href="{% url 'acts:download' act.pk 'pdf' %}" class="btn btn-outline-danger" title="Скачать PDF">
+                                    <i class="bi bi-file-pdf"></i>
+                                </a>
+                                <a href="{% url 'acts:download' act.pk 'xlsx' %}" class="btn btn-outline-success" title="Скачать XLSX">
+                                    <i class="bi bi-file-excel"></i>
+                                </a>
+                                {% if act.status == 'draft' %}
+                                <a href="{% url 'acts:edit' act.pk %}" class="btn btn-outline-warning" title="Редактировать">
+                                    <i class="bi bi-pencil"></i>
+                                </a>
+                                <a href="{% url 'acts:delete' act.pk %}" class="btn btn-outline-danger" title="Удалить">
+                                    <i class="bi bi-trash"></i>
+                                </a>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="7" class="text-center py-4 text-muted">
+                            <i class="bi bi-inbox fs-1 d-block mb-2"></i>
+                            Нет созданных справок КС-3
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

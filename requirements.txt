@@ -1,0 +1,5 @@
+Django>=4.2,<5.0
+aspose-cells-python>=23.0
+python-dotenv>=1.0
+gunicorn>=21.0
+psycopg2-binary>=2.9; sys_platform != 'win32'

@@ -1,0 +1,166 @@
+"""
+Формы для ввода данных актов.
+"""
+from django import forms
+from django.forms import inlineformset_factory, BaseInlineFormSet
+from .models import ActInput, WorkItem
+
+
+class DateInput(forms.DateInput):
+    """Виджет для input type="date" с правильным форматом"""
+    input_type = 'date'
+    
+    def __init__(self, attrs=None, format=None):
+        # Формат для отображения в HTML (обязательно YYYY-MM-DD!)
+        super().__init__(attrs, format='%Y-%m-%d')
+        if attrs is None:
+            attrs = {}
+        attrs.setdefault('class', 'form-control')
+        self.attrs = attrs
+
+
+class ActInputForm(forms.ModelForm):
+    """Основная форма для ввода шапки акта"""
+    
+    contract_date = forms.DateField(
+        widget=DateInput(),
+        label='Дата договора',
+        input_formats=['%Y-%m-%d', '%d.%m.%Y']  # ✅ Принимаем оба формата
+    )
+    report_from = forms.DateField(
+        widget=DateInput(),
+        label='Период с',
+        input_formats=['%Y-%m-%d', '%d.%m.%Y']
+    )
+    report_to = forms.DateField(
+        widget=DateInput(),
+        label='Период по',
+        input_formats=['%Y-%m-%d', '%d.%m.%Y']
+    )
+    
+    class Meta:
+        model = ActInput
+        fields = [
+            'document_number', 'contract_number', 'contract_date',
+            'report_from', 'report_to',
+            'investor', 'investor_okpo', 'customer', 'customer_okpo',
+            'construction', 'object_name', 'operation',
+            'surrender_position', 'surrender_signature',
+            'accept_position', 'accept_signature',
+            'vat_rate', 'smeta', 'status',
+        ]
+        labels = {
+            'act_type': 'Тип документа',
+            'document_number': 'Номер акта',
+            'contract_number': 'Номер договора',
+            'investor': 'Инвестор',
+            'customer': 'Заказчик / Генподрядчик',
+            'construction': 'Наименование стройки',
+            'object_name': 'Объект (если есть)',
+            'operation': 'Вид операции',
+            'surrender_position': 'Должность сдавшего',
+            'surrender_signature': 'ФИО сдавшего',
+            'accept_position': 'Должность принявшего',
+            'accept_signature': 'ФИО принявшего',
+            'vat_rate': 'Ставка НДС',
+            'smeta': 'Сметная стоимость',
+        }
+        widgets = {
+            'contractor': forms.TextInput(attrs={'class': 'form-control', 'readonly': True}),
+            'contractor_okpo': forms.TextInput(attrs={'class': 'form-control', 'readonly': True}),
+            'okdp': forms.TextInput(attrs={'class': 'form-control', 'readonly': True}),
+
+            'investor': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Введите наименование'}),
+            'customer': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Введите наименование'}),
+            'construction': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Например: ЖК "Солнечный", г. Сургут'}),
+            'object_name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Например: Корпус 1, Секция А...'}),
+            'operation': forms.TextInput(attrs={'class': 'form-control'}),
+            'surrender_position': forms.TextInput(attrs={'class': 'form-control'}),
+            'surrender_signature': forms.TextInput(attrs={'class': 'form-control'}),
+            'accept_position': forms.TextInput(attrs={'class': 'form-control'}),
+            'accept_signature': forms.TextInput(attrs={'class': 'form-control'}),
+            'vat_rate': forms.NumberInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Например: 22, 20, 10, 0',
+                'step': '1',
+                'min': '0',
+                'max': '100'
+            }),
+            'smeta': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Введите значение'}),
+            'status': forms.Select(attrs={'class': 'form-select'}),
+        }
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if not self.instance.pk:
+            self.initial['contractor'] = 'ООО "МОСТООТРЯД-69"'
+            self.initial['contractor_okpo'] = '34810147'
+            self.initial['okdp'] = '4530'
+        
+        if self.initial.get('act_type') == 'ks3':
+            self.fields['object_name'].widget = forms.HiddenInput()
+            self.fields['smeta'].widget = forms.HiddenInput()
+        elif self.initial.get('act_type') == 'ks2':
+            self.fields['operation'].widget = forms.HiddenInput()
+
+
+class KS2WorkForm(forms.ModelForm):
+    """Форма для работы в КС-2"""
+    class Meta:
+        model = WorkItem
+        fields = ['position', 'name', 'number_pricelist', 'unit', 'quantity', 'price', 'order']
+        labels = {
+            'position': 'Поз.', 'name': 'Наименование работ', 'number_pricelist': '№ расценки',
+            'unit': 'Ед.', 'quantity': 'Кол-во', 'price': 'Цена, руб.', 'order': 'Порядок',
+        }
+        widgets = {
+            'name': forms.Textarea(attrs={'rows': 2, 'class': 'form-control'}),
+            'position': forms.TextInput(attrs={'class': 'form-control', 'placeholder': '20-30'}),
+            'number_pricelist': forms.TextInput(attrs={'class': 'form-control'}),
+            'unit': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'м2, шт, т...'}),
+            'quantity': forms.NumberInput(attrs={'class': 'form-control'}),
+            'price': forms.NumberInput(attrs={'class': 'form-control'}),
+            'order': forms.NumberInput(attrs={'class': 'form-control', 'value': '0'}),
+        }
+
+
+class KS3WorkForm(forms.ModelForm):
+    """Форма для работы в КС-3"""
+    class Meta:
+        model = WorkItem
+        fields = ['name', 'code', 'cost_from_start', 'cost_from_year', 'cost_report_period', 'order']
+        labels = {
+            'name': 'Наименование работ/затрат', 'code': 'Код',
+            'cost_from_start': 'С начала работ, руб.', 'cost_from_year': 'С начала года, руб.',
+            'cost_report_period': 'За период, руб.', 'order': 'Порядок',
+        }
+        widgets = {
+            'name': forms.Textarea(attrs={'rows': 2, 'class': 'form-control'}),
+            'code': forms.TextInput(attrs={'class': 'form-control', 'placeholder': '20-30'}),
+            'cost_from_start': forms.NumberInput(attrs={'class': 'form-control'}),
+            'cost_from_year': forms.NumberInput(attrs={'class': 'form-control'}),
+            'cost_report_period': forms.NumberInput(attrs={'class': 'form-control'}),
+            'order': forms.NumberInput(attrs={'class': 'form-control', 'value': '0'}),
+        }
+
+
+# === ФАБРИКИ FORMSET (возвращают КЛАССЫ) ===
+KS2WorkFormSet = inlineformset_factory(
+    ActInput, WorkItem,
+    form=KS2WorkForm,
+    extra=1,
+    can_delete=True,
+    can_order=True,
+    max_num=14,
+    validate_max=True,
+)
+
+KS3WorkFormSet = inlineformset_factory(
+    ActInput, WorkItem,
+    form=KS3WorkForm,
+    extra=1,
+    can_delete=True,
+    can_order=True,
+    max_num=14,
+    validate_max=True,
+)

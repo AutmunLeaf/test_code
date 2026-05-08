@@ -1,0 +1,117 @@
+/* === Кастомные стили для Мостоотряд-69 === */
+
+:root {
+    --mo69-blue: #0d6efd;
+    --mo69-dark: #1a1a2e;
+}
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+main {
+    flex: 1 0 auto;
+}
+
+/* Карточки */
+.card {
+    border: none;
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+}
+
+.card-header {
+    font-weight: 500;
+}
+
+/* Таблицы */
+.table-hover tbody tr:hover {
+    background-color: rgba(13, 110, 253, 0.05);
+}
+
+/* Кнопки */
+.btn {
+    font-weight: 500;
+}
+
+.btn-group .btn {
+    border-radius: 0.25rem !important;
+}
+
+.btn-group .btn:not(:last-child) {
+    border-right: none;
+}
+
+/* Формы */
+.form-control:focus, .form-select:focus {
+    border-color: var(--mo69-blue);
+    box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.15);
+}
+
+/* Работа (форма) */
+.work-item {
+    transition: all 0.2s ease;
+}
+
+.work-item:hover {
+    border-left-color: var(--mo69-blue) !important;
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.1);
+}
+
+/* Статусы */
+.badge {
+    font-weight: 500;
+    padding: 0.5em 0.75em;
+}
+
+/* Анимация появления сообщений */
+.alert {
+    animation: slideIn 0.3s ease;
+}
+
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Футер */
+footer {
+    flex-shrink: 0;
+}
+
+/* Адаптив */
+@media (max-width: 768px) {
+    .btn-group .btn {
+        margin-bottom: 0.25rem;
+        border-right: 1px solid rgba(0,0,0,.1) !important;
+        border-radius: 0.25rem !important;
+    }
+    
+    .table-responsive {
+        font-size: 0.875rem;
+    }
+}
+
+/* Печать */
+@media print {
+    .no-print {
+        display: none !important;
+    }
+    
+    body {
+        background: white;
+    }
+    
+    .card {
+        box-shadow: none;
+        border: 1px solid #dee2e6;
+    }
+}

@@ -1,0 +1,145 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ act.act_type|upper }} №{{ act.document_number }}{% endblock %}
+
+{% block content %}
+<div class="row mb-3">
+    <div class="col-12">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb mb-0">
+                <li class="breadcrumb-item"><a href="{% url 'acts:index' %}">Акты</a></li>
+                <li class="breadcrumb-item active">№{{ act.document_number }}</li>
+            </ol>
+        </nav>
+    </div>
+</div>
+
+<div class="card shadow-sm">
+    {# ✅ Используем переменную header_color — никаких if/else в шаблоне #}
+    <div class="card-header bg-{{ header_color }} text-white d-flex justify-content-between align-items-center">
+        <h5 class="mb-0">
+            {{ act.get_act_type_display }} №{{ act.document_number }}
+            <span class="badge bg-light text-dark ms-2">{{ act.get_status_display }}</span>
+        </h5>
+        <div>
+            <a href="{% url 'acts:download' act.pk 'pdf' %}" class="btn btn-light btn-sm me-2">
+                <i class="bi bi-file-pdf"></i> PDF
+            </a>
+            <a href="{% url 'acts:download' act.pk 'xlsx' %}" class="btn btn-light btn-sm">
+                <i class="bi bi-file-excel"></i> XLSX
+            </a>
+        </div>
+    </div>
+    
+    <div class="card-body">
+        <!-- Инфо -->
+         <div class="alert alert-light border mb-4">
+            <form method="post" action="{% url 'acts:update_status' act.id %}" class="row g-2 align-items-center">
+                {% csrf_token %}
+                <div class="col-auto"><strong>Изменить статус:</strong></div>
+                <div class="col-auto">
+                    <select name="status" class="form-select form-select-sm" style="min-width: 160px;">
+                        {% for code, name in statuses %}
+                            <option value="{{ code }}" {% if act.status == code %}selected{% endif %}>{{ name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-auto">
+                    <button type="submit" class="btn btn-sm btn-outline-primary">Применить</button>
+                </div>
+            </form>
+        </div>
+        <div class="row mb-4">
+            <div class="col-md-6">
+                <p><strong>Договор:</strong> {{ act.contract_number }} от {{ act.contract_date|date:"d.m.Y" }}</p>
+                <p><strong>Период:</strong> {{ act.report_from|date:"d.m.Y" }} — {{ act.report_to|date:"d.m.Y" }}</p>
+                <p><strong>НДС:</strong> {{ act.vat_rate }}</p>
+            </div>
+            <div class="col-md-6">
+                <p><strong>Инвестор:</strong> {{ act.investor }} {% if act.investor_okpo %}(ОКПО: {{ act.investor_okpo }}){% endif %}</p>
+                <p><strong>Заказчик:</strong> {{ act.customer }} {% if act.customer_okpo %}(ОКПО: {{ act.customer_okpo }}){% endif %}</p>
+                <p><strong>Подрядчик:</strong> {{ act.contractor }} (ОКПО: {{ act.contractor_okpo }})</p>
+            </div>
+        </div>
+        
+        <p><strong>Стройка:</strong> {{ act.construction }} {% if act.object_name %}— {{ act.object_name }}{% endif %}</p>
+        
+        <!-- Работы -->
+        <h6 class="mt-4">📋 Виды работ ({{ act.works.count }})</h6>
+        <div class="table-responsive">
+            {% if act.act_type == 'ks2' %}
+            <!-- Таблица для КС-2 -->
+            <table class="table table-striped table-sm">
+                <thead>
+                    <tr>
+                        <th>№</th><th>Поз.</th><th>Наименование</th><th>№ расценки</th>
+                        <th>Ед.</th><th>Кол-во</th><th>Цена</th><th>Сумма</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for work in act.works.all %}
+                    <tr>
+                        <td>{{ forloop.counter }}</td>
+                        <td>{{ work.position }}</td>
+                        <td>{{ work.name }}</td>
+                        <td>{{ work.number_pricelist }}</td>
+                        <td>{{ work.unit }}</td>
+                        <td>{{ work.quantity }}</td>
+                        <td>{{ work.price|floatformat:2 }}</td>
+                        <td><strong>{{ work.total_cost_ks2|floatformat:2 }} ₽</strong></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <!-- Таблица для КС-3 -->
+            <table class="table table-striped table-sm">
+                <thead>
+                    <tr>
+                        <th>№</th><th>Наименование</th><th>Код</th>
+                        <th>С начала работ</th><th>С начала года</th><th>За период</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for work in act.works.all %}
+                    <tr>
+                        <td>{{ forloop.counter }}</td>
+                        <td>{{ work.name }}</td>
+                        <td>{{ work.code }}</td>
+                        <td>{{ work.cost_from_start|floatformat:2 }}</td>
+                        <td>{{ work.cost_from_year|floatformat:2 }}</td>
+                        <td><strong>{{ work.cost_report_period|floatformat:2 }} ₽</strong></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% endif %}
+        </div>
+        
+        <!-- Подписи -->
+        <div class="row mt-4 pt-3 border-top">
+            <div class="col-md-6">
+                <p><strong>Сдал:</strong> {{ act.surrender_position }} / {{ act.surrender_signature }}</p>
+            </div>
+            <div class="col-md-6">
+                <p><strong>Принял:</strong> {{ act.accept_position }} / {{ act.accept_signature }}</p>
+            </div>
+        </div>
+        
+        <!-- Кнопки действий -->
+        <div class="mt-4 pt-3 border-top d-flex justify-content-end gap-2">
+            {% if act.status == 'draft' %}
+            <a href="{% url 'acts:edit' act.pk %}" class="btn btn-warning">
+                <i class="bi bi-pencil"></i> Редактировать
+            </a>
+            <a href="{% url 'acts:delete' act.pk %}" class="btn btn-outline-danger">
+                <i class="bi bi-trash"></i> Удалить
+            </a>
+            {% endif %}
+            <a href="{% url 'acts:index' %}" class="btn btn-secondary">
+                <i class="bi bi-arrow-left"></i> К списку
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}

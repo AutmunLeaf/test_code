@@ -1,0 +1,389 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}{{ act_type_display }} — {{ act_type|upper }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .work-item { border-left: 3px solid var(--bs-primary); transition: all 0.2s ease; }
+    .work-item:hover { border-left-color: var(--bs-primary) !important; box-shadow: 0 0.125rem 0.25rem rgba(0,0,0,0.1); }
+    .form-control:read-only { background-color: var(--bs-light) !important; cursor: not-allowed; }
+    .form-label { font-weight: 500; font-size: 0.875rem; color: var(--bs-secondary); }
+</style>
+{% endblock %}
+
+{% if form.errors or formset.errors %}
+<div class="alert alert-danger">
+    <strong>⚠️ Исправьте ошибки:</strong>
+    <ul class="mb-0 mt-2">
+        {% for field, errors in form.errors.items %}
+            {% for error in errors %}
+                <li>{{ field }}: {{ error }}</li>
+            {% endfor %}
+        {% endfor %}
+        {% for form_error in formset.non_form_errors %}
+            <li>{{ form_error }}</li>
+        {% endfor %}
+    </ul>
+</div>
+{% endif %}
+
+{% block content %}
+<div class="row mb-3">
+    <div class="col-12">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb mb-0">
+                <li class="breadcrumb-item"><a href="{% url 'acts:index' %}">Акты</a></li>
+                <li class="breadcrumb-item active">{{ act_type_display }}</li>
+            </ol>
+        </nav>
+    </div>
+</div>
+
+<div class="card shadow-sm">
+    <div class="card-header d-flex justify-content-between align-items-center {% if act_type == 'ks2' %}bg-primary{% else %}bg-success{% endif %} text-white">
+        <h5 class="mb-0">
+            {% if act %}✏️ Редактирование{% else %}➕ Создание{% endif %} {{ act_type_display }}
+        </h5>
+        {% if act %}
+        <div>
+            <a href="{% url 'acts:download' act.pk 'pdf' %}" class="btn btn-light btn-sm me-2">
+                <i class="bi bi-file-pdf"></i> PDF
+            </a>
+            <a href="{% url 'acts:download' act.pk 'xlsx' %}" class="btn btn-light btn-sm">
+                <i class="bi bi-file-excel"></i> XLSX
+            </a>
+        </div>
+        {% endif %}
+    </div>
+    
+    <div class="card-body">
+        <form method="post" id="act-form" novalidate>
+            {% csrf_token %}
+            
+            
+            <!-- Шапка документа -->
+            <h6 class="border-bottom pb-2 mb-3">📋 Шапка документа</h6>
+            <div class="row g-3">
+                <div class="col-md-3">
+                    <label class="form-label">Номер акта *</label>
+                    {{ form.document_number }}
+                    {% if form.document_number.errors %}
+                        <div class="invalid-feedback d-block">{{ form.document_number.errors.0 }}</div>
+                    {% endif %}
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Номер договора *</label>
+                    {{ form.contract_number }}
+                    {% if form.contract_number.errors %}
+                        <div class="invalid-feedback d-block">{{ form.contract_number.errors.0 }}</div>
+                    {% endif %}
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Дата договора *</label>
+                    {{ form.contract_date }}
+                    {% if form.contract_date.errors %}
+                        <div class="invalid-feedback d-block">{{ form.contract_date.errors.0 }}</div>
+                    {% endif %}
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Ставка НДС</label>
+                    {{ form.vat_rate }}
+                </div>
+                
+                <div class="col-md-4">
+                    <label class="form-label">Период с *</label>
+                    {{ form.report_from }}
+                    {% if form.report_from.errors %}
+                        <div class="invalid-feedback d-block">{{ form.report_from.errors.0 }}</div>
+                    {% endif %}
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">по *</label>
+                    {{ form.report_to }}
+                    {% if form.report_to.errors %}
+                        <div class="invalid-feedback d-block">{{ form.report_to.errors.0 }}</div>
+                    {% endif %}
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Сметная стоимость</label>
+                    {{ form.smeta }}
+                </div>
+            </div>
+            
+            <!-- Участники -->
+            <h6 class="border-bottom pb-2 mb-3 mt-4">👥 Участники</h6>
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label class="form-label">Инвестор *</label>
+                    {{ form.investor }}
+                    <label class="form-label">ОКПО</label>
+                    {{ form.investor_okpo }}
+                    {% if form.investor.errors %}
+                        <div class="invalid-feedback d-block">{{ form.investor.errors.0 }}</div>
+                    {% endif %}
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Заказчик / Генподрядчик *</label>
+                    {{ form.customer }}
+                    <label class="form-label">ОКПО</label>
+                    {{ form.customer_okpo }}
+                    {% if form.customer.errors %}
+                        <div class="invalid-feedback d-block">{{ form.customer.errors.0 }}</div>
+                    {% endif %}
+                </div>
+                
+                <div class="col-md-6">
+                        <label class="form-label">Подрядчик (авто)</label>
+                        {{ form.contractor }}  {# Это input type="text" с readonly #}
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">ОКПО подрядчика</label>
+                        {{ form.contractor_okpo }}  {# Это input type="text" с readonly #}
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">ОКДП</label>
+                        {{ form.okdp }}  {# Это input type="text" с readonly #}
+                    </div>
+                </div>
+            
+            <!-- Объект -->
+            <h6 class="border-bottom pb-2 mb-3 mt-4">🏗️ Объект</h6>
+            <div class="row g-3">
+                <div class="col-md-8">
+                    <label class="form-label">Стройка *</label>
+                    {{ form.construction }}
+                    {% if form.construction.errors %}
+                        <div class="invalid-feedback d-block">{{ form.construction.errors.0 }}</div>
+                    {% endif %}
+                </div>
+                {% if act_type == 'ks2' %}
+                <div class="col-md-4">
+                    <label class="form-label">Объект</label>
+                    {{ form.object_name }}
+                </div>
+                {% else %}
+                <div class="col-md-4">
+                    <label class="form-label">Вид операции</label>
+                    {{ form.operation }}
+                </div>
+                {% endif %}
+            </div>
+            
+            <!-- Подписи -->
+            <h6 class="border-bottom pb-2 mb-3 mt-4">✍️ Подписи</h6>
+            <div class="row g-3">
+                <div class="col-md-3">
+                    <label class="form-label">Сдал — должность</label>
+                    {{ form.surrender_position }}
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Сдал — ФИО</label>
+                    {{ form.surrender_signature }}
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Принял — должность</label>
+                    {{ form.accept_position }}
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Принял — ФИО</label>
+                    {{ form.accept_signature }}
+                </div>
+            </div>
+            
+            <!-- Работы -->
+            <h6 class="border-bottom pb-2 mb-3 mt-4 d-flex justify-content-between align-items-center">
+                <span>🔧 Виды работ</span>
+                <button type="button" class="btn btn-sm btn-outline-primary" id="add-work-btn">
+                    <i class="bi bi-plus-lg"></i> Добавить строку
+                </button>
+            </h6>
+            
+            {{ formset.management_form }}
+            <div id="works-container">
+                {% for fs in formset %}
+                <div class="card work-item mb-2">
+                    <div class="card-body py-2">
+                        <div class="row g-2 align-items-end">
+
+                            {# ✅ ОБЯЗАТЕЛЬНО: скрытое поле ID для существующих работ #}
+                            {{ fs.id }}
+
+                            {% if act_type == 'ks2' %}
+                            <!-- Поля для КС-2 -->
+                            <div class="col-md-1">
+                                <label class="form-label small">Поз.</label>
+                                {{ fs.position }}
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label small">Наименование работ *</label>
+                                {{ fs.name }}
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label small">№ расценки</label>
+                                {{ fs.number_pricelist }}
+                            </div>
+                            <div class="col-md-1">
+                                <label class="form-label small">Ед.</label>
+                                {{ fs.unit }}
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label small">Кол-во</label>
+                                {{ fs.quantity }}
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label small">Цена, руб.</label>
+                                {{ fs.price }}
+                            </div>
+                            {% else %}
+                            <!-- Поля для КС-3 -->
+                            <div class="col-md-4">
+                                <label class="form-label small">Наименование работ/затрат *</label>
+                                {{ fs.name }}
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label small">Код</label>
+                                {{ fs.code }}
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label small">С начала работ</label>
+                                {{ fs.cost_from_start }}
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label small">С начала года</label>
+                                {{ fs.cost_from_year }}
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label small">За период *</label>
+                                {{ fs.cost_report_period }}
+                            </div>
+                            {% endif %}
+                            <div class="col-md-1 text-end">
+                                {{ fs.order }}
+                                {% if fs.DELETE %}
+                                <div class="form-check">
+                                    {{ fs.DELETE }}
+                                    <label class="form-check-label small text-danger">Удалить</label>
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            
+            <!-- Кнопки -->
+            <div class="mt-4 pt-3 border-top d-flex justify-content-between flex-wrap gap-2">
+                <a href="{% url 'acts:index' %}" class="btn btn-secondary">
+                    <i class="bi bi-arrow-left"></i> Назад
+                </a>
+                <div class="d-flex gap-2">
+                    {% if act and act.status == 'draft' %}
+                    <a href="{% url 'acts:delete' act.pk %}" class="btn btn-outline-danger">
+                        <i class="bi bi-trash"></i> Удалить
+                    </a>
+                    {% endif %}
+                    {% if act_type == 'ks2' %}
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-save"></i> {% if act %}Сохранить изменения{% else %}Создать и скачать{% endif %}
+                    </button>
+                    {% else %}
+                    <button type="submit" class="btn btn-success">
+                        <i class="bi bi-save"></i> {% if act %}Сохранить изменения{% else %}Создать и скачать{% endif %}
+                    </button>
+                    {% endif %}
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const container = document.getElementById('works-container');
+    const addBtn = document.getElementById('add-work-btn');
+    const totalForms = document.querySelector('#id_works-TOTAL_FORMS');
+    const emptyForm = container.querySelector('.work-item')?.cloneNode(true);
+    
+    if (!emptyForm) {
+        console.warn('⚠️ Шаблон формы работы не найден');
+        return;
+    }
+    
+    let formIndex = parseInt(totalForms.value) || 0;
+    
+    // Очищаем шаблон от значений
+    emptyForm.querySelectorAll('input:not([type="hidden"]), textarea').forEach(input => {
+        input.value = '';
+    });
+    emptyForm.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+        cb.checked = false;
+    });
+    
+    addBtn.addEventListener('click', function() {
+        const newForm = emptyForm.cloneNode(true);
+        
+        // Обновляем атрибуты name и id
+        newForm.querySelectorAll('[name]').forEach(input => {
+            const name = input.name.replace(/-\d+-/, `-${formIndex}-`);
+            input.name = name;
+            if (input.id) {
+                input.id = input.id.replace(/_\d+_/, `_${formIndex}_`);
+            }
+        });
+        
+        // Обновляем label for
+        newForm.querySelectorAll('label[for]').forEach(label => {
+            const forId = label.getAttribute('for').replace(/_\d+_/, `_${formIndex}_`);
+            label.setAttribute('for', forId);
+        });
+        
+        container.appendChild(newForm);
+        formIndex++;
+        totalForms.value = formIndex;
+        
+        // Плавная прокрутка к новой форме
+        newForm.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    });
+    
+    // Удаление работы (чекбокс DELETE)
+    container.addEventListener('change', function(e) {
+        if (e.target.type === 'checkbox' && e.target.name.includes('DELETE')) {
+            const workItem = e.target.closest('.work-item');
+            if (workItem) {
+                workItem.classList.toggle('opacity-50');
+                workItem.classList.toggle('border-danger');
+            }
+        }
+    });
+    
+    // Валидация: подсветка обязательных полей при отправке
+    const form = document.getElementById('act-form');
+    form.addEventListener('submit', function(e) {
+        let valid = true;
+        form.querySelectorAll('[required]').forEach(field => {
+            if (!field.value.trim()) {
+                field.classList.add('is-invalid');
+                valid = false;
+            } else {
+                field.classList.remove('is-invalid');
+            }
+        });
+        if (!valid) {
+            e.preventDefault();
+            alert('⚠️ Заполните все обязательные поля (помечены *)');
+        }
+    });
+    
+    // Убираем подсветку при вводе
+    form.querySelectorAll('input, textarea').forEach(field => {
+        field.addEventListener('input', function() {
+            this.classList.remove('is-invalid');
+        });
+    });
+});
+</script>
+{% endblock %}

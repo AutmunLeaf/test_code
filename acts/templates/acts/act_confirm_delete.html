@@ -1,0 +1,51 @@
+{% extends 'base.html' %}
+
+{% block title %}🗑️ Удаление акта №{{ act.document_number }}{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6 col-lg-5">
+        <div class="card shadow">
+            <div class="card-header bg-danger text-white">
+                <h5 class="mb-0"><i class="bi bi-exclamation-triangle"></i> Подтвердите удаление</h5>
+            </div>
+            
+            <div class="card-body">
+                <p class="lead">
+                    Вы действительно хотите удалить 
+                    <strong>{{ act.get_act_type_display }} №{{ act.document_number }}</strong>?
+                </p>
+                
+                <div class="alert alert-warning">
+                    <i class="bi bi-info-circle"></i> 
+                    Это действие нельзя отменить. Все связанные данные будут удалены.
+                </div>
+                
+                <div class="mb-3">
+                    <p class="mb-1"><strong>Договор:</strong> {{ act.contract_number }}</p>
+                    <p class="mb-1"><strong>Период:</strong> {{ act.report_from|date:"d.m.Y" }} — {{ act.report_to|date:"d.m.Y" }}</p>
+                    <p class="mb-0"><strong>Стройка:</strong> {{ act.construction|truncatechars:50 }}</p>
+                </div>
+                
+                <form method="post">
+                    {% csrf_token %}
+                    <div class="d-flex gap-2 justify-content-end">
+                        <a href="{% url 'acts:detail' act.pk %}" class="btn btn-secondary">
+                            <i class="bi bi-x-lg"></i> Отмена
+                        </a>
+                        <button type="submit" class="btn btn-danger">
+                            <i class="bi bi-trash"></i> Да, удалить
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        
+        <div class="text-center mt-3">
+            <a href="{% url 'acts:index' %}" class="text-muted small">
+                ← Вернуться к списку актов
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}

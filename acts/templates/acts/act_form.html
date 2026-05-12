@@ -58,6 +58,31 @@
     </div>
     
     <div class="card-body">
+        {% if not act or act.status == 'draft' %}
+        <div class="mb-4 pb-3 border-bottom">
+            <form action="{% url 'acts:import_ks6a' %}" method="post" enctype="multipart/form-data" class="row g-2 align-items-end flex-wrap">
+                {% csrf_token %}
+                <input type="hidden" name="act_type" value="{{ act_type }}">
+                {% if act %}
+                <input type="hidden" name="act_pk" value="{{ act.pk }}">
+                {% endif %}
+                <div class="col-12 col-md">
+                    <label class="form-label small mb-0">Импорт работ из КС-6а (Excel)</label>
+                    <input type="file" name="ks6a_file" class="form-control form-control-sm" accept=".xlsx,.xls">
+                </div>
+                <div class="col-auto">
+                    <button type="submit" class="btn btn-sm btn-outline-secondary">Загрузить в форму</button>
+                </div>
+            </form>
+            <p class="small text-muted mb-0 mt-2">
+                На <strong>первом листе</strong> должна быть строка заголовков с колонкой вроде «Наименование работ» и числовые графы (количество, цена, сумма за период и т.п.).
+                {% if act %}
+                Текущие строки работ будут <strong>удалены</strong> и заменены строками из файла.
+                {% endif %}
+            </p>
+        </div>
+        {% endif %}
+
         <form method="post" id="act-form" novalidate>
             {% csrf_token %}
             
@@ -364,6 +389,18 @@ document.addEventListener('DOMContentLoaded', function() {
     const form = document.getElementById('act-form');
     form.addEventListener('submit', function(e) {
         let valid = true;
+        const dateFrom = form.querySelector('#id_report_from');
+        const dateTo = form.querySelector('#id_report_to');
+        if (dateFrom && dateTo && dateFrom.value && dateTo.value) {
+            const from = new Date(dateFrom.value);
+            const to = new Date(dateTo.value);
+            if (to <= from) {
+                e.preventDefault();
+                alert('❌ Дата окончания периода должна быть позже даты начала.');
+                dateTo.classList.add('is-invalid');
+                return;
+            }
+        }
         form.querySelectorAll('[required]').forEach(field => {
             if (!field.value.trim()) {
                 field.classList.add('is-invalid');

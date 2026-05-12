@@ -9,7 +9,10 @@ app_name = 'acts'
 urlpatterns = [
     # Главная
     path('', views.index, name='index'),
-    
+
+    # Импорт работ из КС-6а (Excel)
+    path('import-ks6a/', views.import_ks6a, name='import_ks6a'),
+
     # Создание
     path('ks2/create/', views.create_act, {'act_type': 'ks2'}, name='ks2_create'),
     path('ks3/create/', views.create_act, {'act_type': 'ks3'}, name='ks3_create'),

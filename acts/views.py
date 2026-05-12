@@ -13,7 +13,7 @@ import time
 import logging
 from pathlib import Path
 
-from .models import ActInput, WorkItem, OrgConstants
+from .models import ActInput, WorkItem
 from .forms import (
     ActInputForm,
     KS2WorkForm,
@@ -22,7 +22,7 @@ from .forms import (
 )
 from .utils.ks2_gen import fill_ks2
 from .utils.ks3_gen import fill_ks3
-from .utils.ks6a_import import parse_ks6a_file
+from .utils.ks6a_import import parse_ks6a_workbook
 
 logger = logging.getLogger(__name__)
 
@@ -92,7 +92,7 @@ def import_ks6a(request):
             tmp_path = tmp.name
             for chunk in upload.chunks():
                 tmp.write(chunk)
-        works = parse_ks6a_file(tmp_path)
+        works, act_initial = parse_ks6a_workbook(tmp_path)
     except Exception as e:
         logger.exception('Импорт КС-6а')
         messages.error(request, f'Не удалось прочитать файл: {e}')
@@ -106,11 +106,11 @@ def import_ks6a(request):
             except OSError:
                 pass
 
-    if not works:
+    has_header = any((v or '').strip() for v in (act_initial or {}).values())
+    if not works and not has_header:
         messages.warning(
             request,
-            'Не найдено строк работ. На первом листе должна быть строка заголовков '
-            'с текстом вроде «Наименование работ» и столбцы с количеством, ценой или суммой.'
+            'Не найдено строк работ и реквизитов из фиксированных ячеек. Проверьте первый лист КС-6а.'
         )
         if act_pk:
             return redirect('acts:edit', pk=act_pk)
@@ -124,8 +124,17 @@ def import_ks6a(request):
         )
         works = works[:14]
 
-    request.session['ks6a_import'] = {'works': works, 'act_type': act_type}
-    messages.success(request, f'Из КС-6а подставлено строк работ: {len(works)}.')
+    request.session['ks6a_import'] = {
+        'works': works,
+        'act_type': act_type,
+        'act_initial': act_initial or {},
+    }
+    parts = []
+    if works:
+        parts.append(f'строк работ: {len(works)}')
+    if has_header:
+        parts.append('реквизиты из ячеек шапки')
+    messages.success(request, 'Из КС-6а подставлено: ' + ', '.join(parts) + '.')
 
     if act_pk:
         act = get_object_or_404(ActInput, pk=act_pk)
@@ -152,7 +161,7 @@ def create_act(request, act_type):
     if request.method == 'POST':
         extra = _work_formset_extra_from_post(request.POST)
         FormSetFactory = make_work_formset_class(act_type, extra)
-        form = ActInputForm(request.POST)
+        form = ActInputForm(request.POST, act_type=act_type)
         formset = FormSetFactory(request.POST, prefix=FORMSET_PREFIX)
 
         if not form.is_valid():
@@ -183,14 +192,11 @@ def create_act(request, act_type):
                 )
                 return redirect('acts:download', pk=act.pk, format='pdf')
     else:
-        form = ActInputForm(initial={
-            'act_type': act_type,
-            'contractor': OrgConstants.NAME,
-            'contractor_okpo': OrgConstants.OKPO,
-            'okdp': OrgConstants.OKDP,
-        })
+        form_initial = {}
         imp = request.session.pop('ks6a_import', None)
         if imp and imp.get('act_type') == act_type:
+            ai = {k: v for k, v in (imp.get('act_initial') or {}).items() if (v or '').strip()}
+            form_initial = {**form_initial, **ai}
             works = imp.get('works') or []
             n = min(len(works), 14)
             FormSetFactory = make_work_formset_class(act_type, max(n, 1))
@@ -198,6 +204,7 @@ def create_act(request, act_type):
         else:
             FormSetFactory = make_work_formset_class(act_type, 1)
             formset = FormSetFactory(prefix=FORMSET_PREFIX)
+        form = ActInputForm(initial=form_initial, act_type=act_type)
 
     return render(request, 'acts/act_form.html', {
         'form': form,
@@ -215,7 +222,7 @@ def edit_act(request, pk):
     if request.method == 'POST':
         extra = _work_formset_extra_from_post(request.POST)
         FormSet = make_work_formset_class(act.act_type, extra)
-        form = ActInputForm(request.POST, instance=act)
+        form = ActInputForm(request.POST, instance=act, act_type=act.act_type)
         formset = FormSet(request.POST, instance=act, prefix=FORMSET_PREFIX)
         
         if form.is_valid() and formset.is_valid():
@@ -240,14 +247,16 @@ def edit_act(request, pk):
             if not formset.is_valid():
                 logger.warning(f"❌ Formset errors: {formset.errors}")
     else:
-        form = ActInputForm(instance=act)
         imp = request.session.pop('ks6a_import', None)
         if imp and imp.get('act_type') == act.act_type:
+            ai = {k: v for k, v in (imp.get('act_initial') or {}).items() if (v or '').strip()}
+            form = ActInputForm(instance=act, initial=ai, act_type=act.act_type)
             works = imp.get('works') or []
             n = min(len(works), 14)
             FormSet = make_work_formset_class(act.act_type, max(n, 1))
             formset = FormSet(initial=works[:14], instance=act, prefix=FORMSET_PREFIX)
         else:
+            form = ActInputForm(instance=act, act_type=act.act_type)
             FormSet = make_work_formset_class(act.act_type, 1)
             formset = FormSet(instance=act, prefix=FORMSET_PREFIX)
 

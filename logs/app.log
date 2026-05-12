@@ -113,3 +113,24 @@ Watching for file changes with StatReloader
 Watching for file changes with StatReloader
 /app/mo69_app/settings.py changed, reloading.
 Watching for file changes with StatReloader
+Watching for file changes with StatReloader
+Watching for file changes with StatReloader
+Not Found: /favicon.ico
+Watching for file changes with StatReloader
+[AUDIT] admin → create ActInput#04856b4e-7c13-46f3-987a-535494f3bc49 | {'type': 'ks2'}
+📥 Генерация pdf для акта р
+   Работа 1: Заливка фундамента | Кол-во: 3000.000 | Цена: 100.00
+   Работа 2: Монтаж стеновых конструкций | Кол-во: 10000.000 | Цена: 100.00
+   Работа 3: Разработка котлована | Кол-во: 1000.000 | Цена: 100.00
+   Работа 4: Асфальтирование территории | Кол-во: 6000.000 | Цена: 100.00
+ Сценарий 1: Все работы на 1-й странице
+ PDF сохранён: /app/media/output/tmpbyjrnas1.pdf
+ Заполнено работ: 4
+📥 Генерация pdf для акта р
+   Работа 1: Заливка фундамента | Кол-во: 3000.000 | Цена: 100.00
+   Работа 2: Монтаж стеновых конструкций | Кол-во: 10000.000 | Цена: 100.00
+   Работа 3: Разработка котлована | Кол-во: 1000.000 | Цена: 100.00
+   Работа 4: Асфальтирование территории | Кол-во: 6000.000 | Цена: 100.00
+ Сценарий 1: Все работы на 1-й странице
+ PDF сохранён: /app/media/output/tmp_3vv_ani.pdf
+ Заполнено работ: 4

@@ -85,6 +85,8 @@
 
         <form method="post" id="act-form" novalidate>
             {% csrf_token %}
+            {% if act_type == 'ks2' %}{{ form.operation }}{% endif %}
+            {% if act_type == 'ks3' %}{{ form.object_name }}{{ form.smeta }}{% endif %}
             
             
             <!-- Шапка документа -->
@@ -130,19 +132,21 @@
                         <div class="invalid-feedback d-block">{{ form.report_to.errors.0 }}</div>
                     {% endif %}
                 </div>
+                {% if act_type == 'ks2' %}
                 <div class="col-md-4">
                     <label class="form-label">Сметная стоимость</label>
                     {{ form.smeta }}
                 </div>
+                {% endif %}
             </div>
             
             <!-- Участники -->
             <h6 class="border-bottom pb-2 mb-3 mt-4">👥 Участники</h6>
             <div class="row g-3">
                 <div class="col-md-6">
-                    <label class="form-label">Инвестор *</label>
+                    <label class="form-label">Инвестор</label>
                     {{ form.investor }}
-                    <label class="form-label">ОКПО</label>
+                    <label class="form-label">ОКПО инвестора</label>
                     {{ form.investor_okpo }}
                     {% if form.investor.errors %}
                         <div class="invalid-feedback d-block">{{ form.investor.errors.0 }}</div>
@@ -159,16 +163,16 @@
                 </div>
                 
                 <div class="col-md-6">
-                        <label class="form-label">Подрядчик (авто)</label>
-                        {{ form.contractor }}  {# Это input type="text" с readonly #}
+                        <label class="form-label">Подрядчик *</label>
+                        {{ form.contractor }}
                     </div>
                     <div class="col-md-3">
                         <label class="form-label">ОКПО подрядчика</label>
-                        {{ form.contractor_okpo }}  {# Это input type="text" с readonly #}
+                        {{ form.contractor_okpo }}
                     </div>
                     <div class="col-md-3">
                         <label class="form-label">ОКДП</label>
-                        {{ form.okdp }}  {# Это input type="text" с readonly #}
+                        {{ form.okdp }}
                     </div>
                 </div>
             

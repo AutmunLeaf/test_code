@@ -56,20 +56,25 @@ class ActInput(models.Model):
     report_to = models.DateField(verbose_name='Отчётный период по')
     
     # === Участники ===
-    investor = models.CharField(max_length=200, verbose_name='Инвестор (наименование)')
-    investor_okpo = models.CharField(max_length=20, verbose_name='ОКПО инвестора')
+    investor = models.CharField(
+        max_length=200, blank=True, default='',
+        verbose_name='Инвестор (наименование)',
+    )
+    investor_okpo = models.CharField(
+        max_length=20, blank=True, default='',
+        verbose_name='ОКПО инвестора',
+    )
     
     customer = models.CharField(max_length=200, verbose_name='Заказчик/Генподрядчик')
     customer_okpo = models.CharField(max_length=20, verbose_name='ОКПО заказчика')
     
-    # Подрядчик — всегда Мостоотряд-69 (статика)
     contractor = models.CharField(
-        max_length=200, default=OrgConstants.NAME,
-        verbose_name='Подрядчик', editable=False
+        max_length=200, blank=True, default='',
+        verbose_name='Подрядчик',
     )
     contractor_okpo = models.CharField(
-        max_length=20, default=OrgConstants.OKPO,
-        verbose_name='ОКПО подрядчика', editable=False
+        max_length=20, blank=True, default='',
+        verbose_name='ОКПО подрядчика',
     )
     
     # === Объект строительства ===
@@ -82,8 +87,8 @@ class ActInput(models.Model):
     
     # === Вид деятельности ===
     okdp = models.CharField(
-        max_length=10, default=OrgConstants.OKDP,
-        verbose_name='Вид деятельности по ОКДП', editable=False
+        max_length=10, blank=True, default='',
+        verbose_name='Вид деятельности по ОКДП',
     )
     
     # === Подписи ===

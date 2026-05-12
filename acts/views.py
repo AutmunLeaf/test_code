@@ -92,7 +92,7 @@ def import_ks6a(request):
             tmp_path = tmp.name
             for chunk in upload.chunks():
                 tmp.write(chunk)
-        works, act_initial = parse_ks6a_workbook(tmp_path)
+        works, act_initial = parse_ks6a_workbook(tmp_path, act_type=act_type)
     except Exception as e:
         logger.exception('Импорт КС-6а')
         messages.error(request, f'Не удалось прочитать файл: {e}')

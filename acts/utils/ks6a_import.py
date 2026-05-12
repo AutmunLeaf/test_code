@@ -88,6 +88,17 @@ def _to_decimal(val: Any) -> Decimal | None:
         return None
 
 
+def _okpo_str(raw: str) -> str:
+    """Excel часто отдаёт ОКПО как float → '987654321.0'; в форме нужны только цифры."""
+    s = (raw or "").strip().replace("\xa0", "").replace(" ", "")
+    if not s or s in ("-", "—", "–"):
+        return ""
+    d = _to_decimal(s.replace(",", "."))
+    if d is not None and d == d.to_integral_value():
+        return format(int(d), "d")
+    return raw.strip()
+
+
 # (поле внутренней карты, ключевые фразы в заголовке, чем длиннее — тем приоритетнее)
 HEADER_RULES: list[tuple[str, tuple[str, ...]]] = [
     (
@@ -207,12 +218,16 @@ def read_ks6a_act_field_initial(ws: Any) -> dict[str, str]:
         if field == "smeta":
             d = _to_decimal(raw)
             out[field] = _decimal_for_session(d) if d is not None else raw
+        elif field in ("customer_okpo", "contractor_okpo"):
+            ok = _okpo_str(raw)
+            if ok:
+                out[field] = ok
         else:
             out[field] = raw
     return out
 
 
-def _parse_work_rows_from_ws(ws: Any) -> list[dict[str, Any]]:
+def _parse_work_rows_from_ws(ws: Any, act_type: str) -> list[dict[str, Any]]:
     header_row, colmap = _best_header_row(ws)
     if header_row is None or "name" not in colmap:
         logger.warning("КС-6а: не найдена строка заголовков с графой наименования работ")
@@ -248,7 +263,7 @@ def _parse_work_rows_from_ws(ws: Any) -> list[dict[str, Any]]:
         code = col("code") if "code" in colmap else ""
         if not position:
             position = code
-        if not code:
+        if act_type != "ks3" and not code:
             code = position
         number_pricelist = col("number_pricelist")
         unit = col("unit")
@@ -283,10 +298,11 @@ def _parse_work_rows_from_ws(ws: Any) -> list[dict[str, Any]]:
             price = crp
 
         order = len(out)
+        code_out = "" if act_type == "ks3" else (code or position)
         row_dict: dict[str, Any] = {
             "position": position,
             "name": name,
-            "code": code or position,
+            "code": code_out,
             "number_pricelist": number_pricelist,
             "unit": unit,
             "quantity": _decimal_for_session(qty) if qty is not None else "",
@@ -303,14 +319,14 @@ def _parse_work_rows_from_ws(ws: Any) -> list[dict[str, Any]]:
     return out
 
 
-def parse_ks6a_workbook(path: str) -> tuple[list[dict[str, Any]], dict[str, str]]:
+def parse_ks6a_workbook(path: str, act_type: str = "ks2") -> tuple[list[dict[str, Any]], dict[str, str]]:
     """Полный разбор первого листа: (строки работ, initial для ActInputForm)."""
     wb = None
     try:
         wb = ac.Workbook(path)
         ws = wb.worksheets[0]
         act_initial = read_ks6a_act_field_initial(ws)
-        works = _parse_work_rows_from_ws(ws)
+        works = _parse_work_rows_from_ws(ws, act_type)
         return works, act_initial
     finally:
         if wb is not None:

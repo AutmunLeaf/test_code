@@ -179,7 +179,7 @@ def fill_ks2(template_path, output_path, data, format='pdf'):
             total_p2 = sum(w.get("quantity", 0) * w.get("price", 0) for w in works_p2)
 
             # Итог по первой странице (ячейка 37,29 – строка 37, столбец 29)
-            set_cell_number_format(ws, 36, 29, round(total_p1, 2), "#,##0.00")
+            set_cell_number_format(ws, 37, 29, round(total_p1, 2), "#,##0.00")
             
             grand_total = total_p1 + total_p2
             grand_vat = grand_total * vat_rate

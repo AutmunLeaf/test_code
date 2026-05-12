@@ -11,16 +11,30 @@ import os
 import tempfile
 import time
 import logging
+from pathlib import Path
 
 from .models import ActInput, WorkItem, OrgConstants
 from .forms import (
-    ActInputForm, KS2WorkFormSet, KS3WorkFormSet,
-    KS2WorkForm, KS3WorkForm
+    ActInputForm,
+    KS2WorkForm,
+    KS3WorkForm,
+    make_work_formset_class,
 )
 from .utils.ks2_gen import fill_ks2
 from .utils.ks3_gen import fill_ks3
+from .utils.ks6a_import import parse_ks6a_file
 
 logger = logging.getLogger(__name__)
+
+FORMSET_PREFIX = 'works'
+
+
+def _work_formset_extra_from_post(post_data):
+    try:
+        n = int(post_data.get(f'{FORMSET_PREFIX}-TOTAL_FORMS', 1))
+    except (TypeError, ValueError):
+        n = 1
+    return min(max(n, 1), 14)
 
 
 def log_action(user, action, target_model, target_id, details=None):
@@ -51,17 +65,95 @@ def index(request):
 
 
 @login_required
+def import_ks6a(request):
+    """Загрузка Excel КС-6а: строки работ в сессию и редирект на форму акта."""
+    if request.method != 'POST':
+        return redirect('acts:index')
+
+    act_type = request.POST.get('act_type')
+    if act_type not in ('ks2', 'ks3'):
+        messages.error(request, 'Неверный тип акта')
+        return redirect('acts:index')
+
+    upload = request.FILES.get('ks6a_file')
+    if not upload:
+        messages.error(request, 'Выберите файл КС-6а (Excel).')
+        return redirect('acts:ks2_create' if act_type == 'ks2' else 'acts:ks3_create')
+
+    ext = Path(upload.name).suffix.lower()
+    if ext not in ('.xlsx', '.xls'):
+        messages.error(request, 'Нужен файл Excel с расширением .xlsx или .xls.')
+        return redirect('acts:ks2_create' if act_type == 'ks2' else 'acts:ks3_create')
+
+    act_pk = request.POST.get('act_pk')
+    tmp_path = None
+    try:
+        with tempfile.NamedTemporaryFile(delete=False, suffix=ext) as tmp:
+            tmp_path = tmp.name
+            for chunk in upload.chunks():
+                tmp.write(chunk)
+        works = parse_ks6a_file(tmp_path)
+    except Exception as e:
+        logger.exception('Импорт КС-6а')
+        messages.error(request, f'Не удалось прочитать файл: {e}')
+        if act_pk:
+            return redirect('acts:edit', pk=act_pk)
+        return redirect('acts:ks2_create' if act_type == 'ks2' else 'acts:ks3_create')
+    finally:
+        if tmp_path and os.path.exists(tmp_path):
+            try:
+                os.unlink(tmp_path)
+            except OSError:
+                pass
+
+    if not works:
+        messages.warning(
+            request,
+            'Не найдено строк работ. На первом листе должна быть строка заголовков '
+            'с текстом вроде «Наименование работ» и столбцы с количеством, ценой или суммой.'
+        )
+        if act_pk:
+            return redirect('acts:edit', pk=act_pk)
+        return redirect('acts:ks2_create' if act_type == 'ks2' else 'acts:ks3_create')
+
+    total = len(works)
+    if total > 14:
+        messages.warning(
+            request,
+            f'В журнале найдено {total} строк; в форму перенесены только первые 14 (лимит акта).',
+        )
+        works = works[:14]
+
+    request.session['ks6a_import'] = {'works': works, 'act_type': act_type}
+    messages.success(request, f'Из КС-6а подставлено строк работ: {len(works)}.')
+
+    if act_pk:
+        act = get_object_or_404(ActInput, pk=act_pk)
+        if act.act_type != act_type:
+            messages.error(request, 'Тип акта не совпадает с выбранной формой импорта.')
+            return redirect('acts:edit', pk=act.pk)
+        if act.status != 'draft':
+            messages.error(request, 'Импорт доступен только для актов в статусе «Черновик».')
+            return redirect('acts:edit', pk=act.pk)
+        with transaction.atomic():
+            WorkItem.objects.filter(act=act).delete()
+        return redirect('acts:edit', pk=act.pk)
+
+    return redirect('acts:ks2_create' if act_type == 'ks2' else 'acts:ks3_create')
+
+
+@login_required
 def create_act(request, act_type):
     """Создание нового акта (КС-2 или КС-3)"""
     if act_type not in ['ks2', 'ks3']:
         messages.error(request, 'Неверный тип акта')
         return redirect('acts:index')
-    
-    FormSetFactory = KS2WorkFormSet if act_type == 'ks2' else KS3WorkFormSet
-    
+
     if request.method == 'POST':
+        extra = _work_formset_extra_from_post(request.POST)
+        FormSetFactory = make_work_formset_class(act_type, extra)
         form = ActInputForm(request.POST)
-        formset = FormSetFactory(request.POST, prefix='works')
+        formset = FormSetFactory(request.POST, prefix=FORMSET_PREFIX)
 
         if not form.is_valid():
             logger.warning(f"❌ Form errors: {form.errors}")
@@ -97,8 +189,16 @@ def create_act(request, act_type):
             'contractor_okpo': OrgConstants.OKPO,
             'okdp': OrgConstants.OKDP,
         })
-        formset = FormSetFactory(prefix='works')
-    
+        imp = request.session.pop('ks6a_import', None)
+        if imp and imp.get('act_type') == act_type:
+            works = imp.get('works') or []
+            n = min(len(works), 14)
+            FormSetFactory = make_work_formset_class(act_type, max(n, 1))
+            formset = FormSetFactory(initial=works[:14], prefix=FORMSET_PREFIX)
+        else:
+            FormSetFactory = make_work_formset_class(act_type, 1)
+            formset = FormSetFactory(prefix=FORMSET_PREFIX)
+
     return render(request, 'acts/act_form.html', {
         'form': form,
         'formset': formset,
@@ -111,12 +211,12 @@ def create_act(request, act_type):
 def edit_act(request, pk):
     """Редактирование существующего акта"""
     act = get_object_or_404(ActInput, pk=pk)
-    
-    FormSet = KS2WorkFormSet if act.act_type == 'ks2' else KS3WorkFormSet
-    
+
     if request.method == 'POST':
+        extra = _work_formset_extra_from_post(request.POST)
+        FormSet = make_work_formset_class(act.act_type, extra)
         form = ActInputForm(request.POST, instance=act)
-        formset = FormSet(request.POST, instance=act, prefix='works')
+        formset = FormSet(request.POST, instance=act, prefix=FORMSET_PREFIX)
         
         if form.is_valid() and formset.is_valid():
             with transaction.atomic():
@@ -141,8 +241,16 @@ def edit_act(request, pk):
                 logger.warning(f"❌ Formset errors: {formset.errors}")
     else:
         form = ActInputForm(instance=act)
-        formset = FormSet(instance=act, prefix='works')
-    
+        imp = request.session.pop('ks6a_import', None)
+        if imp and imp.get('act_type') == act.act_type:
+            works = imp.get('works') or []
+            n = min(len(works), 14)
+            FormSet = make_work_formset_class(act.act_type, max(n, 1))
+            formset = FormSet(initial=works[:14], instance=act, prefix=FORMSET_PREFIX)
+        else:
+            FormSet = make_work_formset_class(act.act_type, 1)
+            formset = FormSet(instance=act, prefix=FORMSET_PREFIX)
+
     return render(request, 'acts/act_form.html', {
         'form': form,
         'formset': formset,

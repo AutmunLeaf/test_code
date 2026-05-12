@@ -47,7 +47,7 @@ class ActInputForm(forms.ModelForm):
             'construction', 'object_name', 'operation',
             'surrender_position', 'surrender_signature',
             'accept_position', 'accept_signature',
-            'vat_rate', 'smeta', 'status',
+            'vat_rate', 'smeta', 
         ]
         labels = {
             'act_type': 'Тип документа',
@@ -102,7 +102,16 @@ class ActInputForm(forms.ModelForm):
             self.fields['smeta'].widget = forms.HiddenInput()
         elif self.initial.get('act_type') == 'ks2':
             self.fields['operation'].widget = forms.HiddenInput()
+    def clean(self):
+        cleaned_data = super().clean()
+        report_from = cleaned_data.get('report_from')
+        report_to = cleaned_data.get('report_to')
 
+        if report_from and report_to and report_to <= report_from:
+            raise forms.ValidationError(
+                '❌ Дата окончания периода должна быть позже даты начала.'
+            )
+        return cleaned_data
 
 class KS2WorkForm(forms.ModelForm):
     """Форма для работы в КС-2"""
@@ -145,22 +154,40 @@ class KS3WorkForm(forms.ModelForm):
 
 
 # === ФАБРИКИ FORMSET (возвращают КЛАССЫ) ===
-KS2WorkFormSet = inlineformset_factory(
-    ActInput, WorkItem,
-    form=KS2WorkForm,
-    extra=1,
-    can_delete=True,
-    can_order=True,
-    max_num=14,
-    validate_max=True,
-)
+def make_ks2_work_formset(extra: int = 1):
+    """extra — число пустых/начальных строк (1…14), нужно для импорта КС-6а."""
+    extra = min(max(int(extra), 1), 14)
+    return inlineformset_factory(
+        ActInput, WorkItem,
+        form=KS2WorkForm,
+        extra=extra,
+        can_delete=True,
+        can_order=True,
+        max_num=14,
+        validate_max=True,
+    )
 
-KS3WorkFormSet = inlineformset_factory(
-    ActInput, WorkItem,
-    form=KS3WorkForm,
-    extra=1,
-    can_delete=True,
-    can_order=True,
-    max_num=14,
-    validate_max=True,
-)
+
+def make_ks3_work_formset(extra: int = 1):
+    extra = min(max(int(extra), 1), 14)
+    return inlineformset_factory(
+        ActInput, WorkItem,
+        form=KS3WorkForm,
+        extra=extra,
+        can_delete=True,
+        can_order=True,
+        max_num=14,
+        validate_max=True,
+    )
+
+
+def make_work_formset_class(act_type: str, extra: int = 1):
+    if act_type == 'ks2':
+        return make_ks2_work_formset(extra)
+    if act_type == 'ks3':
+        return make_ks3_work_formset(extra)
+    raise ValueError(f'Неизвестный тип акта: {act_type}')
+
+
+KS2WorkFormSet = make_ks2_work_formset(1)
+KS3WorkFormSet = make_ks3_work_formset(1)

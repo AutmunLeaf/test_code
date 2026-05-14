@@ -2,6 +2,8 @@
 Формы для ввода данных актов.
 """
 from django import forms
+
+from .constants import MAX_WORK_ROWS_KS2, MAX_WORK_ROWS_KS3
 from django.forms import inlineformset_factory, BaseInlineFormSet
 from .models import ActInput, WorkItem
 
@@ -161,28 +163,28 @@ class KS3WorkForm(forms.ModelForm):
 
 # === ФАБРИКИ FORMSET (возвращают КЛАССЫ) ===
 def make_ks2_work_formset(extra: int = 1):
-    """extra — число пустых/начальных строк (1…14), нужно для импорта КС-6а."""
-    extra = min(max(int(extra), 1), 14)
+    """extra — число пустых/начальных строк, нужно для импорта КС-6а."""
+    extra = min(max(int(extra), 1), MAX_WORK_ROWS_KS2)
     return inlineformset_factory(
         ActInput, WorkItem,
         form=KS2WorkForm,
         extra=extra,
         can_delete=True,
         can_order=True,
-        max_num=14,
+        max_num=MAX_WORK_ROWS_KS2,
         validate_max=True,
     )
 
 
 def make_ks3_work_formset(extra: int = 1):
-    extra = min(max(int(extra), 1), 14)
+    extra = min(max(int(extra), 1), MAX_WORK_ROWS_KS3)
     return inlineformset_factory(
         ActInput, WorkItem,
         form=KS3WorkForm,
         extra=extra,
         can_delete=True,
         can_order=True,
-        max_num=14,
+        max_num=MAX_WORK_ROWS_KS3,
         validate_max=True,
     )
 

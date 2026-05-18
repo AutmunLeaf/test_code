@@ -2,6 +2,8 @@
 Формы для ввода данных актов.
 """
 from django import forms
+
+from .constants import MAX_WORK_ROWS_KS2, MAX_WORK_ROWS_KS3
 from django.forms import inlineformset_factory, BaseInlineFormSet
 from .models import ActInput, WorkItem
 
@@ -21,7 +23,7 @@ class DateInput(forms.DateInput):
 
 class ActInputForm(forms.ModelForm):
     """Основная форма для ввода шапки акта"""
-    
+
     contract_date = forms.DateField(
         widget=DateInput(),
         label='Дата договора',
@@ -44,16 +46,20 @@ class ActInputForm(forms.ModelForm):
             'document_number', 'contract_number', 'contract_date',
             'report_from', 'report_to',
             'investor', 'investor_okpo', 'customer', 'customer_okpo',
+            'contractor', 'contractor_okpo', 'okdp',
             'construction', 'object_name', 'operation',
             'surrender_position', 'surrender_signature',
             'accept_position', 'accept_signature',
-            'vat_rate', 'smeta', 
+            'vat_rate', 'smeta',
         ]
         labels = {
-            'act_type': 'Тип документа',
             'document_number': 'Номер акта',
             'contract_number': 'Номер договора',
-            'investor': 'Инвестор',
+            'investor': 'Инвестор (необязательно)',
+            'investor_okpo': 'ОКПО инвестора',
+            'contractor': 'Подрядчик',
+            'contractor_okpo': 'ОКПО подрядчика',
+            'okdp': 'ОКДП',
             'customer': 'Заказчик / Генподрядчик',
             'construction': 'Наименование стройки',
             'object_name': 'Объект (если есть)',
@@ -66,11 +72,11 @@ class ActInputForm(forms.ModelForm):
             'smeta': 'Сметная стоимость',
         }
         widgets = {
-            'contractor': forms.TextInput(attrs={'class': 'form-control', 'readonly': True}),
-            'contractor_okpo': forms.TextInput(attrs={'class': 'form-control', 'readonly': True}),
-            'okdp': forms.TextInput(attrs={'class': 'form-control', 'readonly': True}),
+            'contractor': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Наименование подрядчика'}),
+            'contractor_okpo': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'ОКПО'}),
+            'okdp': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'ОКДП'}),
 
-            'investor': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Введите наименование'}),
+            'investor': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'При отсутствии — оставьте пустым'}),
             'customer': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Введите наименование'}),
             'construction': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Например: ЖК "Солнечный", г. Сургут'}),
             'object_name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Например: Корпус 1, Секция А...'}),
@@ -90,18 +96,17 @@ class ActInputForm(forms.ModelForm):
             'status': forms.Select(attrs={'class': 'form-select'}),
         }
     
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, act_type=None, **kwargs):
+        self._act_type = act_type
         super().__init__(*args, **kwargs)
-        if not self.instance.pk:
-            self.initial['contractor'] = 'ООО "МОСТООТРЯД-69"'
-            self.initial['contractor_okpo'] = '34810147'
-            self.initial['okdp'] = '4530'
-        
-        if self.initial.get('act_type') == 'ks3':
+        at = act_type or self.initial.get('act_type') or getattr(self.instance, 'act_type', None)
+
+        if at == 'ks3':
             self.fields['object_name'].widget = forms.HiddenInput()
             self.fields['smeta'].widget = forms.HiddenInput()
-        elif self.initial.get('act_type') == 'ks2':
+        elif at == 'ks2':
             self.fields['operation'].widget = forms.HiddenInput()
+
     def clean(self):
         cleaned_data = super().clean()
         report_from = cleaned_data.get('report_from')
@@ -111,6 +116,9 @@ class ActInputForm(forms.ModelForm):
             raise forms.ValidationError(
                 '❌ Дата окончания периода должна быть позже даты начала.'
             )
+        contractor = (cleaned_data.get('contractor') or '').strip()
+        if not contractor:
+            self.add_error('contractor', 'Укажите подрядчика.')
         return cleaned_data
 
 class KS2WorkForm(forms.ModelForm):
@@ -155,28 +163,28 @@ class KS3WorkForm(forms.ModelForm):
 
 # === ФАБРИКИ FORMSET (возвращают КЛАССЫ) ===
 def make_ks2_work_formset(extra: int = 1):
-    """extra — число пустых/начальных строк (1…14), нужно для импорта КС-6а."""
-    extra = min(max(int(extra), 1), 14)
+    """extra — число пустых/начальных строк, нужно для импорта КС-6а."""
+    extra = min(max(int(extra), 1), MAX_WORK_ROWS_KS2)
     return inlineformset_factory(
         ActInput, WorkItem,
         form=KS2WorkForm,
         extra=extra,
         can_delete=True,
         can_order=True,
-        max_num=14,
+        max_num=MAX_WORK_ROWS_KS2,
         validate_max=True,
     )
 
 
 def make_ks3_work_formset(extra: int = 1):
-    extra = min(max(int(extra), 1), 14)
+    extra = min(max(int(extra), 1), MAX_WORK_ROWS_KS3)
     return inlineformset_factory(
         ActInput, WorkItem,
         form=KS3WorkForm,
         extra=extra,
         can_delete=True,
         can_order=True,
-        max_num=14,
+        max_num=MAX_WORK_ROWS_KS3,
         validate_max=True,
     )
 

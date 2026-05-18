@@ -8,9 +8,15 @@ from aspose.cells import SaveFormat
 import gc
 import traceback
 import logging
-from django.conf import settings
+
+from ..constants import MAX_WORK_ROWS_KS3
 
 logger = logging.getLogger(__name__)
+
+# В исходном шаблоне под строки таблицы отведены строки 31–44 (14 шт., 1-based).
+_TEMPLATE_TABLE_ROWS = 14
+# Вставка доп. строк перед этой строкой (0-based): блок итогов/НДС сдвигается вниз.
+_INSERT_EXTRA_ROWS_BEFORE_INDEX = 44
 
 
 def set_cell_number_format(ws, row, col, value, fmt):
@@ -75,55 +81,59 @@ def fill_ks3(template_path, output_path, data, format='pdf'):
         ws.cells.get("N53").put_value(data.get("accept_position", "     "))
         ws.cells.get("AJ54").put_value(data.get("accept_signature", "     "))
         
-        # 4. Заполнение работ (макс 14)
+        # 4. Заполнение работ (14 слотов в шаблоне + insert_rows при большем числе)
         start_row = 31
-        end_row = 44
-        
-        works = data.get("works", [])
-        if len(works) > 14:
-            logger.warning(f" Работ больше 14 ({len(works)}), будут заполнены только первые 14")
-            works = works[:14]
-        
-        # Очистка
-        for r in range(start_row, end_row + 1):
+
+        works = list(data.get("works") or [])
+        if len(works) > MAX_WORK_ROWS_KS3:
+            logger.warning(
+                " Работ больше %s (%s), будут заполнены только первые %s",
+                MAX_WORK_ROWS_KS3,
+                len(works),
+                MAX_WORK_ROWS_KS3,
+            )
+            works = works[:MAX_WORK_ROWS_KS3]
+        n = len(works)
+        extra = max(0, n - _TEMPLATE_TABLE_ROWS)
+        if extra:
+            ws.cells.insert_rows(_INSERT_EXTRA_ROWS_BEFORE_INDEX, extra)
+
+        for r in range(start_row, start_row + n):
             for c in range(50):
                 ws.cells.get(r - 1, c).put_value("    ")
-        
-        # Заполнение
-        row = start_row
+
         total_report_period = 0.0
-        
+
         for i, work in enumerate(works, start=1):
+            row = start_row + i - 1
             ws.cells.get(row - 1, 0).put_value(i)
             ws.cells.get(row - 1, 3).put_value(work.get("name", "     "))
             ws.cells.get(row - 1, 26).put_value(work.get("code", "     "))
-            
-            # Денежные суммы – формат с двумя знаками
+
             cost_from_start = float(work.get("cost_from_start", 0))
             cost_from_year = float(work.get("cost_from_year", 0))
             cost_period = float(work.get("cost_report_period", 0))
-            
+
             set_cell_number_format(ws, row - 1, 30, cost_from_start, "#,##0.00")
             set_cell_number_format(ws, row - 1, 37, cost_from_year, "#,##0.00")
             set_cell_number_format(ws, row - 1, 45, cost_period, "#,##0.00")
-            
+
             total_report_period += cost_period
-            row += 1
-        
-        # Итого за период
-        set_cell_number_format(ws, 43, 45, total_report_period, "#,##0.00")  # строка 44 → индекс 43
-        
-        # НДС и итог с НДС
-        vat_rate = float(str(data.get("vat_rate", "20%")).replace('%', '')) / 100
+
+        # Итого / НДС: на последней строке данных (кол. 45) и двух строках ниже — как в шаблоне на 14 строк
+        s0 = 30 + n - 1
+        set_cell_number_format(ws, s0, 45, total_report_period, "#,##0.00")
+        vat_rate = float(str(data.get("vat_rate", "20%")).replace("%", "")) / 100
         vat_amount = total_report_period * vat_rate
         total_with_vat = total_report_period + vat_amount
-        
-        ws.cells.get(44, 44).put_value(f"Сумма НДС {int(round(vat_rate * 100))}%")
-        set_cell_number_format(ws, 44, 45, round(vat_amount, 2), "#,##0.00")
-        set_cell_number_format(ws, 45, 45, round(total_with_vat, 2), "#,##0.00")
-        
-        # Удаляем пустые строки
-        for r in range(44, start_row - 1, -1):
+
+        ws.cells.get(s0 + 1, 44).put_value(f"Сумма НДС {int(round(vat_rate * 100))}%")
+        set_cell_number_format(ws, s0 + 1, 45, round(vat_amount, 2), "#,##0.00")
+        set_cell_number_format(ws, s0 + 2, 45, round(total_with_vat, 2), "#,##0.00")
+
+        for r in range(start_row + n - 1, start_row - 1, -1):
+            if (r - 1) >= s0:
+                continue
             cell_val = ws.cells.get(r - 1, 3).value
             if cell_val is None or str(cell_val).strip() in ("", " ", "", " "):
                 ws.cells.delete_rows(r - 1, 1)
@@ -138,7 +148,7 @@ def fill_ks3(template_path, output_path, data, format='pdf'):
             wb.save(output_path, SaveFormat.PDF)
             logger.info(f" PDF сохранён: {output_path}")
         
-        logger.info(f" Заполнено работ: {len(works)} из 14")
+        logger.info(f" Заполнено работ: {n}")
         logger.info(f" Итого за период: {total_report_period}")
         
         return output_path
